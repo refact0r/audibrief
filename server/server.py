@@ -1,4 +1,5 @@
 import asyncio
+from random import random
 import aiohttp
 import os
 from datetime import datetime
@@ -14,6 +15,7 @@ import aiohttp
 from dotenv import load_dotenv
 import time
 import base64
+import json
 
 # load the environment variables from the .env file
 load_dotenv()
@@ -52,19 +54,25 @@ async def cleanup():
 @app.get("/")
 async def root():
     articles = await getArticles()
-    return {"articles": articles}
+    with open("result.json", "w") as f:
+        f.write(json.dumps({"articles": articles}))
+    return {"articles": ""}
 
 
 # custom route: return generated audio from custom article link
 @app.post("/custom")
 async def custom():
-    return {"articles": getArticles()}
+    data = await request.get_json()
+    article = await getCustom(data["prompt"], data["link"])
+    return article
 
 
 # test route
-@app.post("/test")
+@app.get("/test")
 async def test():
-    return {"articles": getArticles()}
+    with open("result.json") as f:
+        data = f.read()
+    return json.loads(data)
 
 
 # get top 5 news articles from google news
@@ -96,7 +104,7 @@ async def getArticles():
     tasks = []
     for article in articles:
         task = asyncio.create_task(
-            coro=generateAudio(
+            coro=generateSummary(
                 "Summarize this news article with detail: ", article["content"]
             ),
         )
@@ -105,10 +113,34 @@ async def getArticles():
     # gather results from all tasks
     results = await asyncio.gather(*tasks, return_exceptions=False)
     for i in range(len(articles)):
-        articles[i]["audio"] = results[i]
+        articles[i]["summary"] = results[i]
         articles[i].pop("content", None)
 
+    # generate audio (can't be done in parallel because of api rate limits)
+    for i in range(len(articles)):
+        articles[i]["audio"] = await generateAudio(articles[i]["summary"])
+
     return articles
+
+
+# get brief from custom prompt and link
+# cache results for 1 hour (because ai is slow and expensive)
+@cached(ttl=3600)
+async def getCustom(prompt, link):
+    # crawl article
+    article = await crawlArticle(link)
+
+    # validate article is good
+    if not article or len(article["content"]) < 200:
+        return {}
+
+    # generate audio for each article
+    article["summary"], article["audio"] = await generateAudio(
+        prompt, article["content"]
+    )
+    article.pop("content", None)
+
+    return article
 
 
 # crawl an article and return its title, content, and link
@@ -141,10 +173,10 @@ async def crawlArticle(link):
     return {"title": title, "content": content, "link": str(response.url)}
 
 
-# generate audio from article content
+# generate summary from article content
 # cache results for 1 hour
 @cached(ttl=3600)
-async def generateAudio(prompt, content):
+async def generateSummary(prompt, content):
     # get generated completion from openai
     completion = await app.openai.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -165,6 +197,13 @@ async def generateAudio(prompt, content):
     print(summary)
     print()
 
+    return summary
+
+
+# generate audio from summary
+# cache results for 1 hour
+@cached(ttl=3600)
+async def generateAudio(summary):
     # id of "Alice" voice
     voiceId = "Xb7hH8MSUJpSbSDYk0k2"
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}"
@@ -183,8 +222,12 @@ async def generateAudio(prompt, content):
         "xi-api-key": elevenlabs_key,
         "Content-Type": "application/json",
     }
+    # avoid overloading api
+    await asyncio.sleep(random() * 4)
     # send request to elevenlabs
     response = await app.aiohttp.post(url, json=payload, headers=headers)
+
+    print(response)
 
     # save audio to file (FOR TESTING)
     # CHUNK_SIZE = 1024
@@ -197,7 +240,7 @@ async def generateAudio(prompt, content):
 
     # encode audio to base64
     data = await response.content.read()
-    base64_audio = base64.b64encode(data).decode()
+    base64_audio = base64.b64encode(data).decode("utf-8")
 
     # save audio to text file (FOR TESTING)
     # with open(f"{content[0:10]}.txt", "wb") as f:
