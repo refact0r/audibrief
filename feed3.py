@@ -8,26 +8,28 @@ url = "https://news.google.com/rss"
 
 feed = feedparser.parse(url)
 
-for link in feed.entries:
-    print(link)
-    response = requests.get(link)
+done = 0
 
-    if response.history:
-        print("Request was redirected")
-        for resp in response.history:
-            print(resp.status_code, resp.url)
-        print("Final destination:")
-        print(response.status_code, response.url)
+articles = []
+
+for entry in feed.entries:
+    print(entry.link)
+    response = requests.get(entry.link)
+    print(response.url)
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    content = ""
+
+    for p in soup("h1") + soup("p"):
+        content += p.get_text(strip=True) + "\n"
+
+    if len(content) > 200:
+        done += 1
     else:
-        print("Request was not redirected")
+        continue
 
-eleven_response = requests.get(link)
+    articles.append({"title": entry.title "content": content, "link": response.url})
 
-soup = BeautifulSoup(eleven_response.text, "html.parser")
-
-content = ""
-
-for p in soup("h1") + soup("p"):
-    content += p.get_text(strip=True) + "\n"
-
-print(content)
+    if done == 5:
+        break
