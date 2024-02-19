@@ -12,9 +12,9 @@ link = feed.entries[0].link
 
 print(link)
 
-eleven_response = requests.get(link)
+response = requests.get(link)
 
-soup = BeautifulSoup(eleven_response.text, "html.parser")
+soup = BeautifulSoup(response.text, "html.parser")
 
 content = ""
 
