@@ -2,6 +2,7 @@ from datetime import datetime
 from quart import Quart
 from quart import request
 from cachetools import cached, TTLCache
+from quart_cors import cors
 import requests
 import feedparser
 import openai
@@ -9,12 +10,12 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 
 app = Quart(__name__)
+app = cors(app, allow_origin="*")
 
 
-@app.post("/")
+@app.get("/")
 async def root():
-    data = await request.get_json()
-    return getArticles()
+    return {"articles": getArticles()}
 
 
 @cached(cache=TTLCache(maxsize=1, ttl=600))
