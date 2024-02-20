@@ -7,7 +7,7 @@
 		<h1>Audibrief</h1>
 		<div class="links">
 			<a href="/">Home</a>
-			<a href="/about">Custom</a>
+			<a href="/custom">Custom</a>
 			<a href="/about">About</a>
 			<a href="/settings">Settings</a>
 		</div>
