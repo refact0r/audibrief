@@ -28,6 +28,7 @@
 		if (current < briefs.length) {
 			briefs[current].audioElem.play();
 			current += 1;
+			briefs[current].style1 = 'height: auto;';
 		}
 	}
 
@@ -41,30 +42,24 @@
 			brief.audioElem.removeEventListener('ended', playNext);
 		});
 	}
-
-	onMount(() => {
-		// briefs.forEach((brief) => {
-		// 	brief.audioElem = new Audio('data:audio/mpeg;base64,' + brief.audio);
-		// });
-	});
 </script>
 
 <main>
-	<h1>Audibrief</h1>
+	<div class="header">
+		<p>Top 5 news stories from Google News</p>
+		<button on:click={playAll}>{playing ? 'Stop' : 'Play All'}</button>
+	</div>
 	<br />
-
-	<button on:click={playAll}>{playing ? 'Stop' : 'Play All'}</button>
 	<div class="briefs">
 		{#each briefs as brief, i}
 			<div class="brief">
 				<h2>{brief.title}</h2>
 
-				<p style={brief.style1}>{brief.summary}</p>
+				<p>{brief.summary}</p>
 				<audio
 					src="data:audio/mpeg;base64,{brief.audio}"
 					bind:this={briefs[i].audioElem}
 					controls
-					style={brief.style2}
 				/>
 			</div>
 		{/each}
@@ -72,34 +67,43 @@
 </main>
 
 <style>
-	h1 {
-		font-size: 4rem;
-		margin: 0;
+	.header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin: 1rem 0 0 0;
 	}
 
 	.brief {
-		padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+		padding: 1.5rem;
 		background: var(--bg-1);
+		display: flex;
+		flex-direction: column;
+		border-radius: 2rem;
 	}
 
 	.briefs {
-		margin: 2rem 0;
 		display: flex;
 		flex-direction: column;
 		gap: 1.5rem;
 	}
 
-	h2 {
-		margin: 0 0 1rem 0;
+	p {
+		font-size: 1.2rem;
 	}
 
-	p {
-		margin: 0 0 1rem 0;
+	h2 {
+		margin: 0;
+	}
+
+	.briefs p {
+		margin: 1rem 0;
 	}
 
 	audio {
-		width: calc(100% + 0.7rem);
-		margin-left: -0.7rem;
+		width: calc(100% + 0.6rem);
+		margin-left: -0.6rem;
+		height: 2rem;
 	}
 
 	audio::-webkit-media-controls {
