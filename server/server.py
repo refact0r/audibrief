@@ -241,6 +241,3 @@ async def generateAudio(summary):
     #     f.write(base64_audio.encode("utf-8"))
 
     return base64_audio
-
-
-app.run()
