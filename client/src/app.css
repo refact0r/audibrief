@@ -1,5 +1,6 @@
 :root {
-	--bg-0: hsl(60 40% 95%);
+	--bg-0: hsl(60 35% 93%);
+	--bg-1: hsl(60 20% 85%);
 	--txt: hsl(60 40% 10%);
 }
 
@@ -17,6 +18,8 @@ body {
 button {
 	color: var(--bg-0);
 	font: inherit;
+	font-weight: 500;
+	font-size: 1.2rem;
 	background: var(--txt);
 	border: none;
 	padding: 0.6rem 1rem;
