@@ -8,6 +8,7 @@
 
 <style>
 	.app {
-		margin: 3rem;
+		max-width: 60rem;
+		margin: 3rem auto;
 	}
 </style>
