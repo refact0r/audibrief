@@ -1,6 +1,4 @@
 <script>
-	import { onMount } from 'svelte';
-
 	export let data;
 
 	console.log(data);
@@ -9,6 +7,7 @@
 	let playing = false;
 	let current = 0;
 
+	// initialize and start playing audio in sequence
 	function playAll() {
 		if (playing) {
 			stopAll();
@@ -24,6 +23,7 @@
 		playNext();
 	}
 
+	// play the next audio
 	function playNext() {
 		if (current < briefs.length) {
 			briefs[current].audioElem.play();
@@ -32,6 +32,7 @@
 		}
 	}
 
+	// stop all audio
 	function stopAll() {
 		playing = false;
 		current = 0;
@@ -106,10 +107,6 @@
 		height: 2rem;
 	}
 
-	audio::-webkit-media-controls {
-	}
-
-	/* remove volume control */
 	audio::-webkit-media-controls-enclosure {
 		background: none;
 	}
