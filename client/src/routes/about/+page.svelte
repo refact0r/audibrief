@@ -1,4 +1,4 @@
-<p>Made by Yifan, Harry, Jay, and Sheik for the Spring 2024 EmP Hackfest.</p>
+<p>Made by Yifan, Harry, Jay, and Gani for the Spring 2024 EmP Hackfest.</p>
 
 <style>
 	p {
