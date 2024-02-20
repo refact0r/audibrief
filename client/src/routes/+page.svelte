@@ -54,7 +54,7 @@
 	<div class="briefs">
 		{#each briefs as brief, i}
 			<div class="brief">
-				<h2>{brief.title}</h2>
+				<a href={brief.link}><h2>{brief.title}</h2></a>
 
 				<p>{brief.summary}</p>
 				<audio
@@ -68,6 +68,11 @@
 </main>
 
 <style>
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+
 	.header {
 		display: flex;
 		justify-content: space-between;
