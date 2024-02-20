@@ -2,18 +2,14 @@ import asyncio
 from random import random
 import aiohttp
 import os
-from datetime import datetime
 from quart import Quart
 from quart import request
-from aiocache import Cache, cached
+from aiocache import cached
 from quart_cors import cors
 import feedparser
 import openai
 from bs4 import BeautifulSoup
-from pathlib import Path
-import aiohttp
 from dotenv import load_dotenv
-import time
 import base64
 import json
 
