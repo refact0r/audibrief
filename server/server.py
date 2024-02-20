@@ -54,9 +54,7 @@ async def cleanup():
 @app.get("/")
 async def root():
     articles = await getArticles()
-    with open("result.json", "w") as f:
-        f.write(json.dumps({"articles": articles}))
-    return {"articles": ""}
+    return {"articles": articles}
 
 
 # custom route: return generated audio from custom article link
