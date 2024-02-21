@@ -2,6 +2,10 @@
 	import '../app.css';
 </script>
 
+<div class="banner">
+	Note: Due to API costs, this site has been disconnected from a live server. The data shown below
+	is an example generated on 2/19/2024.
+</div>
 <div class="app">
 	<div class="header">
 		<h1>Audibrief</h1>
@@ -44,6 +48,12 @@
 
 	.app {
 		max-width: 60rem;
-		margin: 3rem auto;
+		margin: 2rem auto;
+	}
+
+	.banner {
+		background-color: var(--bg-1);
+		padding: 1rem;
+		text-align: center;
 	}
 </style>
