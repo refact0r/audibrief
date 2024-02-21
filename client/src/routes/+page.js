@@ -7,8 +7,28 @@ export async function load({ fetch }) {
 	// fetch data from the server
 	const response = await fetch(PUBLIC_API_URL);
 
-	// parse the response as JSON
-	const articles = await response.json();
+	async function readAllChunks(readableStream) {
+		const reader = readableStream.getReader();
+		const chunks = [];
+
+		let done, value;
+		while (!done) {
+			({ value, done } = await reader.read());
+			if (done) {
+				return chunks;
+			}
+			chunks.push(value);
+		}
+	}
+
+	let allchunks = await readAllChunks(response.body);
+
+	let string = '';
+	for (let chunk of allchunks) {
+		string += new TextDecoder().decode(chunk);
+	}
+
+	let articles = JSON.parse(string);
 
 	return {
 		articles

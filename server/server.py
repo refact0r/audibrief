@@ -1,8 +1,9 @@
 import asyncio
 from random import random
+import time
 import aiohttp
 import os
-from quart import Quart
+from quart import Quart, make_response
 from quart import request
 from aiocache import cached
 from quart_cors import cors
@@ -35,22 +36,23 @@ app = QuartApp(__name__)
 app = cors(app, allow_origin="*")
 
 
+# setup aiohttp and openai clients
 @app.before_serving
 async def startup():
     app.aiohttp = aiohttp.ClientSession()
     app.openai = openai.AsyncOpenAI(api_key=openai_key)
 
 
+# close aiohttp client when server stops
 @app.after_serving
 async def cleanup():
     await app.aiohttp.close()
 
 
 # root route: return generated audio from top 5 news articles from google news
-@app.get("/")
+@app.get("/")  # type: ignore
 async def root():
-    articles = await getArticles()
-    return {"articles": articles}
+    return async_generator_openai()
 
 
 # custom route: return generated audio from custom article link
@@ -62,37 +64,19 @@ async def custom():
 
 
 # test route
-@app.get("/test")
-async def test():
+@app.get("/example")
+async def example():
     with open("result.json") as f:
         data = f.read()
     return json.loads(data)
 
 
-# get top 5 news articles from google news
-# cache results for 1 hour (because ai is slow and expensive)
-@cached(ttl=3600)
-async def getArticles():
+# root route async generator to stream audio results (from elevenlabs)
+async def async_generator():
+    yield '{"articles": ['.encode()
+
     # get articles from google news rss feed
-    url = "https://news.google.com/rss"
-    feed = feedparser.parse(url)
-
-    # loop through and crawl articles
-    done = 0
-    articles = []
-    for entry in feed.entries:
-        article = await crawlArticle(entry.link)
-
-        # validate article is good
-        if not article or len(article["content"]) < 200:
-            continue
-
-        articles.append(article)
-
-        # stop after 5 valid articles
-        done += 1
-        if done == 5:
-            break
+    articles = await getArticles()
 
     # generate audio for each article
     tasks = []
@@ -106,19 +90,110 @@ async def getArticles():
 
     # gather results from all tasks
     results = await asyncio.gather(*tasks, return_exceptions=False)
+
+    # create new articles (using the old articles reference will alter the cached articles)
+    new_articles = []
     for i in range(len(articles)):
-        articles[i]["summary"] = results[i]
-        articles[i].pop("content", None)
+        new_articles.append(
+            {
+                "title": articles[i]["title"],
+                "link": articles[i]["link"],
+                "summary": results[i],
+            }
+        )
 
     # generate audio (can't be done in parallel because of api rate limits)
+    for i in range(len(new_articles)):
+        new_articles[i]["audio"] = await generateAudio(new_articles[i]["summary"])
+        yield (
+            json.dumps(new_articles[i]) + (", " if i < len(new_articles) - 1 else "")
+        ).encode()
+
+    yield "]}".encode()
+
+
+# root route async generator to stream audio results (from openai)
+async def async_generator_openai():
+    yield '{"articles": '.encode()
+
+    # get articles from google news rss feed
+    articles = await getArticles()
+
+    # create tasks to generate summary and audio for each article
+    tasks = []
     for i in range(len(articles)):
-        articles[i]["audio"] = await generateAudio(articles[i]["summary"])
+        task = asyncio.create_task(coro=generateSummaryAndAudio(articles[i]))
+        tasks.append(task)
+
+    # gather results from all tasks
+    results = await asyncio.gather(*tasks, return_exceptions=False)
+
+    # create new articles (using the old articles reference will alter the cached articles)
+    new_articles = []
+    for i in range(len(articles)):
+        new_articles.append(
+            {
+                "title": articles[i]["title"],
+                "link": articles[i]["link"],
+                "summary": results[i][0],
+                "audio": results[i][1],
+            }
+        )
+
+    yield json.dumps(new_articles).encode()
+
+    yield "}".encode()
+
+
+# get summary and audio for article in sequence
+@cached(ttl=3600)
+async def generateSummaryAndAudio(article):
+    # generate summary for article
+    summary = await generateSummary(
+        "Summarize this news article with detail: ", article["content"]
+    )
+
+    # generate audio for summary
+    audio = await generateAudioOpenAI(summary)
+
+    return (summary, audio)
+
+
+# fetch, crawl, and parse articles from google news rss feed
+@cached(ttl=3600)
+async def getArticles():
+    # get articles from google news rss feed
+    url = "https://news.google.com/rss"
+    feed = feedparser.parse(url)
+
+    # loop through and crawl articles
+    done = 0
+    articles = []
+    for entry in feed.entries:
+        article = await crawlArticle(entry.link)
+
+        # validate article is good
+        if not article or "content" not in article or len(article["content"]) < 200:
+            continue
+
+        articles.append(article)
+
+        # stop after 5 valid articles
+        done += 1
+        if done == 5:
+            break
 
     return articles
 
 
-# get brief from custom prompt and link
-# cache results for 1 hour (because ai is slow and expensive)
+async def fakeArticles():
+    return [
+        {"title": "title1", "link": "link1", "content": "content1"},
+        {"title": "title2", "link": "link2", "content": "content2"},
+    ]
+
+
+# get audio from custom prompt and link
 @cached(ttl=3600)
 async def getCustom(prompt, link):
     # crawl article
@@ -130,7 +205,7 @@ async def getCustom(prompt, link):
 
     # generate audio for each article
     article["summary"], article["audio"] = await generateAudio(
-        prompt, article["content"]
+        prompt, article["content"], 0
     )
     article.pop("content", None)
 
@@ -138,7 +213,6 @@ async def getCustom(prompt, link):
 
 
 # crawl an article and return its title, content, and link
-# cache results for 1 hour
 @cached(ttl=3600)
 async def crawlArticle(link):
     print("crawling article: " + link)
@@ -168,7 +242,6 @@ async def crawlArticle(link):
 
 
 # generate summary from article content
-# cache results for 1 hour
 @cached(ttl=3600)
 async def generateSummary(prompt, content):
     # get generated completion from openai
@@ -182,9 +255,6 @@ async def generateSummary(prompt, content):
         ],
     )
 
-    print(completion)
-    print()
-
     # extract summary from completion response
     summary = completion.choices[0].message.content
 
@@ -194,8 +264,11 @@ async def generateSummary(prompt, content):
     return summary
 
 
-# generate audio from summary
-# cache results for 1 hour
+async def fakeSummary(prompt, content):
+    return "summary"
+
+
+# generate audio from summary (elevenlabs)
 @cached(ttl=3600)
 async def generateAudio(summary):
     # id of "Alice" voice
@@ -216,8 +289,6 @@ async def generateAudio(summary):
         "xi-api-key": elevenlabs_key,
         "Content-Type": "application/json",
     }
-    # avoid overloading api
-    await asyncio.sleep(random() * 4)
     # send request to elevenlabs
     response = await app.aiohttp.post(url, json=payload, headers=headers)
 
@@ -241,3 +312,24 @@ async def generateAudio(summary):
     #     f.write(base64_audio.encode("utf-8"))
 
     return base64_audio
+
+
+# generate audio from summary (openai)
+@cached(ttl=3600)
+async def generateAudioOpenAI(summary):
+    # get audio from openai
+    response = await app.openai.audio.speech.create(
+        model="tts-1",
+        voice="alloy",
+        input=summary,
+        response_format="mp3",
+    )
+
+    # encode audio to base64
+    base64_audio = base64.b64encode(response.content).decode("utf-8")
+
+    return base64_audio
+
+
+async def fakeAudio(summary):
+    return "audio"
